@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"/>
+<title>My Library | Smart Notes AI Dashboard</title>
+<meta name="description" content="Manage your AI-generated summaries and chat with your academic documents."/>
+<meta name="robots" content="noindex, nofollow"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "tertiary-container": "#a17cec",
+          "surface-container-high": "#28283a",
+          "on-background": "#e3e0f8",
+          "surface-container-lowest": "#0c0c1d",
+          "error-container": "#93000a",
+          "surface-bright": "#38374a",
+          "surface-variant": "#333345",
+          "secondary": "#bcc7dd",
+          "secondary-fixed": "#d8e3fa",
+          "error": "#ffb4ab",
+          "outline": "#8f909e",
+          "surface": "#121222",
+          "tertiary-fixed-dim": "#d2bbff",
+          "outline-variant": "#444653",
+          "primary-container": "#7189f6",
+          "on-primary-fixed": "#001356",
+          "inverse-primary": "#3c55bf",
+          "tertiary-fixed": "#eaddff",
+          "tertiary": "#d2bbff",
+          "on-surface-variant": "#c5c5d5",
+          "surface-container-highest": "#333345",
+          "surface-container-low": "#1a1a2b",
+          "background": "#121222",
+          "secondary-container": "#3c475a",
+          "on-error-container": "#ffdad6",
+          "on-tertiary": "#3d0e84",
+          "on-primary": "#002388",
+          "on-primary-container": "#001e78",
+          "surface-container": "#1e1e2f",
+          "primary": "#b9c3ff",
+          "on-surface": "#e3e0f8",
+        },
+        fontFamily: { "headline": ["Manrope"], "body": ["Inter"] }
+      }
+    }
+  }
+</script>
+<style>
+  .material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; vertical-align: middle; }
+  .glass-panel { background: rgba(40,40,58,0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #121222; }
+  ::-webkit-scrollbar-thumb { background: #333345; border-radius: 10px; }
+  .note-item { transition: all 0.2s ease; cursor: pointer; }
+  .note-item:hover { background: rgba(40,40,58,0.8); }
+  .note-item.active { background: rgba(113,137,246,0.18); border-left: 3px solid #7189f6; }
+  .context-menu { min-width: 160px; z-index: 9999; }
+  #chat-messages .user-msg {
+    background: rgba(113,137,246,0.15); border: 1px solid rgba(113,137,246,0.25);
+    border-radius: 1rem 1rem 0.25rem 1rem; margin-left: auto; max-width: 80%;
+  }
+  #chat-messages .ai-msg {
+    background: rgba(40,40,58,0.8); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 1rem 1rem 1rem 0.25rem; max-width: 90%;
+  }
+  .typing-dots span { animation: blink 1.4s infinite both; display: inline-block; }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
+  #upload-area { border: 2px dashed rgba(113,137,246,0.3); transition: all 0.3s; }
+  #upload-area:hover, #upload-area.drag-over { border-color: #7189f6; background: rgba(113,137,246,0.06); }
+  .ai-msg code { background: rgba(113,137,246,0.18)!important; color: #b9c3ff!important; padding: 0.15rem 0.35rem!important; border-radius: 0.3rem!important; font-family: 'JetBrains Mono','Fira Code',monospace!important; border: 1px solid rgba(113,137,246,0.2)!important; }
+  .ai-msg p { margin-bottom: 0.6rem; }
+  .ai-msg ul, .ai-msg ol { margin-left: 1.25rem; margin-bottom: 0.6rem; list-style-type: unset; }
+  .ai-msg li { margin-bottom: 0.2rem; }
+  .ai-msg strong { color: #e3e0f8; font-weight: 600; }
+  .ai-msg h1,.ai-msg h2,.ai-msg h3 { color: #b9c3ff; font-weight: 700; margin-top: 0.8rem; margin-bottom: 0.4rem; }
+  .ai-msg table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; border: 1px solid rgba(255,255,255,0.1); }
+  .ai-msg th,.ai-msg td { border: 1px solid rgba(255,255,255,0.1); padding: 0.4rem 0.6rem; text-align: left; font-size: 0.85rem; }
+  .ai-msg th { background: rgba(255,255,255,0.05); }
+  .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+  .toast { padding: 0.7rem 1.1rem; border-radius: 0.75rem; font-size: 0.8rem; font-weight: 500; animation: toastIn 0.3s ease; pointer-events: auto; }
+  .toast.success { background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.3); color: #86efac; }
+  .toast.error   { background: rgba(239,68,68,0.18);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+  .toast.info    { background: rgba(113,137,246,0.18); border: 1px solid rgba(113,137,246,0.3); color: #b9c3ff; }
+  @keyframes toastIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  /* Summary HTML styling */
+  #summary-content h1, #summary-content h2, #summary-content h3 { color: #b9c3ff; font-weight: 700; margin: 1rem 0 0.4rem; }
+  #summary-content h1 { font-size: 1.2rem; }
+  #summary-content h2 { font-size: 1.05rem; }
+  #summary-content h3 { font-size: 0.95rem; }
+  #summary-content p  { margin-bottom: 0.6rem; font-size: 0.9rem; line-height: 1.65; }
+  #summary-content ul, #summary-content ol { margin-left: 1.2rem; margin-bottom: 0.6rem; list-style-type: unset; }
+  #summary-content li { margin-bottom: 0.2rem; font-size: 0.875rem; }
+  #summary-content strong { color: #e3e0f8; font-weight: 600; }
+  #summary-content code { background: rgba(113,137,246,0.15); color: #b9c3ff; padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
+  .modal-backdrop { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+  .slide-in { animation: slideDown 0.3s ease; }
+  @keyframes slideDown { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen overflow-hidden">
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header class="fixed top-0 left-0 right-0 z-50 h-[60px] flex items-center justify-between px-6 bg-gradient-to-r from-[#1e1e2f] to-[#28283a] border-b border-white/5 shadow-2xl shadow-indigo-950/20">
+  <div class="flex items-center gap-3">
+    <span class="text-xl font-bold tracking-tighter text-primary font-headline flex items-center gap-2">
+      <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">auto_stories</span>
+      Smart Notes
+    </span>
+  </div>
+  <div class="flex items-center gap-3">
+    <!-- User menu -->
+    <div class="relative" id="user-menu-wrapper">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors" id="user-menu-trigger" onclick="toggleUserMenu()">
+        <span class="material-symbols-outlined text-primary" style="font-variation-settings:'FILL' 1;">account_circle</span>
+        <span class="text-sm font-medium text-slate-400 hidden md:block max-w-[180px] truncate" id="user-email-display">User</span>
+        <span class="material-symbols-outlined text-slate-500 text-base">expand_more</span>
+      </div>
+      <div class="absolute right-0 top-full mt-2 w-56 glass-panel rounded-xl opacity-0 invisible transition-all duration-200 p-2 shadow-2xl border border-white/10" id="user-dropdown">
+        <div class="px-3 py-1.5 text-[10px] text-on-surface-variant uppercase tracking-widest font-bold border-b border-white/5 mb-1 truncate" id="dropdown-email">Account</div>
+        <button onclick="openChangePasswordModal()" class="w-full text-left px-3 py-2 text-sm hover:bg-white/5 rounded-lg transition-colors text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">lock</span>Change Password
+        </button>
+      </div>
+    </div>
+    <button id="logout-btn" onclick="logout()" class="bg-white/10 hover:bg-white/20 text-on-surface px-4 py-1.5 rounded-full text-sm font-semibold transition-all active:scale-95">
+      Logout
+    </button>
+    <button class="md:hidden bg-white/10 p-2 rounded-lg" id="mobile-menu-btn" onclick="toggleSidebar()">
+      <span class="material-symbols-outlined text-primary">menu</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside class="h-screen w-72 fixed left-0 top-0 bg-[#121222] flex flex-col py-5 gap-4 pt-[68px] overflow-y-auto z-40 border-r border-white/5 transition-transform duration-300" id="sidebar">
+  <div class="px-5 mb-1">
+    <div class="text-tertiary font-headline font-bold text-sm mb-0.5">My Library</div>
+    <div class="text-slate-500 text-[10px] font-medium uppercase tracking-widest">AI Assistant Active</div>
+  </div>
+
+  <!-- Upload area -->
+  <div class="px-4">
+    <div id="upload-area" class="rounded-xl p-5 text-center cursor-pointer bg-surface-container-low group" onclick="document.getElementById('file-input').click()">
+      <span class="material-symbols-outlined text-3xl text-outline mb-2 group-hover:text-primary-container transition-colors block">upload_file</span>
+      <p class="text-sm font-medium text-on-surface-variant">Click to upload PDF</p>
+      <p class="text-[10px] text-outline mt-1 italic">Max 10 MB · PDF only</p>
+    </div>
+    <input type="file" id="file-input" accept=".pdf" class="hidden"/>
+  </div>
+
+  <!-- Notes list -->
+  <nav class="flex flex-col gap-0.5 px-3 overflow-y-auto flex-1" id="notes-nav">
+    <div class="px-3 py-2 text-[10px] font-bold text-tertiary uppercase tracking-[0.15em] mb-1">Notes</div>
+    <div id="notes-list" class="flex flex-col gap-0.5">
+      <div class="text-center text-slate-500 text-sm py-10" id="notes-empty-state">
+        <span class="material-symbols-outlined block text-4xl mb-2 mx-auto">inbox</span>
+        No notes yet.<br>Upload a PDF to get started.
+      </div>
+    </div>
+  </nav>
+</aside>
+
+<!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+<main class="ml-72 pt-[60px] h-screen flex flex-col overflow-hidden transition-all duration-300" id="main-content">
+
+  <!-- Welcome / empty state -->
+  <div class="flex-1 flex flex-col items-center justify-center text-center p-8 gap-6" id="welcome-screen">
+    <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary-container to-tertiary-container/50 flex items-center justify-center shadow-2xl">
+      <span class="material-symbols-outlined text-5xl text-white" style="font-variation-settings:'FILL' 1;">auto_stories</span>
+    </div>
+    <div>
+      <h2 class="text-2xl font-headline font-bold text-on-surface mb-2">Welcome to Smart Notes</h2>
+      <p class="text-on-surface-variant text-sm max-w-md">Upload a PDF from the sidebar to get AI-generated summaries and start asking questions about your documents.</p>
+    </div>
+    <div class="flex gap-3 flex-wrap justify-center">
+      <div class="glass-panel rounded-xl px-4 py-3 text-center border border-white/5">
+        <span class="material-symbols-outlined text-primary text-2xl block mb-1">summarize</span>
+        <span class="text-xs text-on-surface-variant">AI Summaries</span>
+      </div>
+      <div class="glass-panel rounded-xl px-4 py-3 text-center border border-white/5">
+        <span class="material-symbols-outlined text-tertiary text-2xl block mb-1">question_answer</span>
+        <span class="text-xs text-on-surface-variant">Interactive Q&amp;A</span>
+      </div>
+      <div class="glass-panel rounded-xl px-4 py-3 text-center border border-white/5">
+        <span class="material-symbols-outlined text-secondary text-2xl block mb-1">search</span>
+        <span class="text-xs text-on-surface-variant">Semantic Search</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note viewer (hidden until note selected) -->
+  <div class="flex-1 flex overflow-hidden hidden" id="note-viewer">
+
+    <!-- Summary panel -->
+    <div class="flex-1 flex flex-col overflow-hidden border-r border-white/5" id="summary-panel">
+      <!-- Note header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-surface-container-low/40">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="material-symbols-outlined text-primary" style="font-variation-settings:'FILL' 1;">description</span>
+          <h2 class="font-headline font-bold text-on-surface truncate text-lg" id="note-title-display">Note Title</h2>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-tertiary px-2 py-0.5 rounded-full bg-tertiary/10 border border-tertiary/20 shrink-0">AI ANALYSIS</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="downloadSummary()" title="Download Summary as PDF"
+            class="p-2 rounded-lg hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-colors" id="download-btn">
+            <span class="material-symbols-outlined text-sm">download</span>
+          </button>
+          <button onclick="openRenameModal()" title="Rename Note"
+            class="p-2 rounded-lg hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-colors">
+            <span class="material-symbols-outlined text-sm">edit</span>
+          </button>
+          <button onclick="deleteCurrentNote()" title="Delete Note"
+            class="p-2 rounded-lg hover:bg-red-500/10 text-on-surface-variant hover:text-error transition-colors">
+            <span class="material-symbols-outlined text-sm">delete</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Summary content -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-4" id="summary-scroll">
+        <!-- Processing state -->
+        <div class="hidden" id="processing-state">
+          <div class="flex flex-col items-center gap-4 py-16 text-center">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-container to-tertiary-container/50 flex items-center justify-center animate-pulse">
+              <span class="material-symbols-outlined text-white" style="font-variation-settings:'FILL' 1;">psychology</span>
+            </div>
+            <div>
+              <p class="font-semibold text-on-surface mb-1">Processing your PDF…</p>
+              <p class="text-sm text-on-surface-variant">AI is reading and generating insights</p>
+            </div>
+            <div class="typing-dots text-primary text-2xl"><span>·</span><span>·</span><span>·</span></div>
+          </div>
+        </div>
+        <!-- Summary section label -->
+        <div class="hidden" id="summary-section">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings:'FILL' 1;">summarize</span>
+            <span class="text-xs font-bold uppercase tracking-widest text-primary">AI Summary</span>
+          </div>
+          <div class="text-on-surface-variant text-sm leading-relaxed" id="summary-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat panel -->
+    <div class="w-[400px] shrink-0 flex flex-col overflow-hidden bg-surface-container-low/20" id="chat-panel">
+      <!-- Chat header -->
+      <div class="flex items-center justify-between px-4 py-4 border-b border-white/5">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-tertiary text-sm" style="font-variation-settings:'FILL' 1;">smart_toy</span>
+          <span class="text-sm font-bold font-headline text-on-surface">Ask AI</span>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-tertiary px-2 py-0.5 rounded-full bg-tertiary/10 border border-tertiary/20">Context-Aware</span>
+        </div>
+        <button onclick="clearChat()" title="Clear chat"
+          class="p-1.5 rounded-lg hover:bg-white/10 text-outline hover:text-on-surface-variant transition-colors">
+          <span class="material-symbols-outlined text-sm">delete_sweep</span>
+        </button>
+      </div>
+
+      <!-- Chat messages -->
+      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3" id="chat-messages">
+        <div class="text-center py-10 text-on-surface-variant text-sm" id="chat-empty-state">
+          <span class="material-symbols-outlined block text-4xl mb-2 text-outline">chat_bubble_outline</span>
+          Ask any question about this document
+        </div>
+      </div>
+
+      <!-- Chat input -->
+      <div class="p-4 border-t border-white/5">
+        <div class="flex gap-2 items-end">
+          <textarea id="chat-input" rows="2" placeholder="Ask about this document…"
+            class="flex-1 bg-surface-container rounded-xl px-4 py-3 text-sm text-on-surface placeholder-outline resize-none focus:outline-none focus:ring-1 focus:ring-primary-container/50 border border-white/5"
+            onkeydown="handleChatKey(event)"></textarea>
+          <button id="send-btn" onclick="sendChat()"
+            class="bg-gradient-to-br from-primary-container to-tertiary-container/60 hover:opacity-90 text-white rounded-xl p-3 transition-all active:scale-95 shrink-0">
+            <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1;">send</span>
+          </button>
+        </div>
+        <p class="text-[10px] text-outline mt-1.5 text-center">Shift+Enter for new line · Enter to send</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Upload progress overlay -->
+  <div class="hidden fixed inset-0 z-[200] flex items-center justify-center modal-backdrop" id="upload-overlay">
+    <div class="glass-panel rounded-2xl p-8 text-center border border-white/10 max-w-xs w-full mx-4 shadow-2xl">
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-container to-tertiary-container/50 flex items-center justify-center mx-auto mb-4 animate-pulse">
+        <span class="material-symbols-outlined text-white text-3xl" style="font-variation-settings:'FILL' 1;">upload_file</span>
+      </div>
+      <p class="font-headline font-bold text-on-surface mb-1">Uploading & Analyzing</p>
+      <p class="text-sm text-on-surface-variant mb-4">Please wait while AI processes your PDF…</p>
+      <div class="w-full bg-surface-container rounded-full h-1.5">
+        <div class="bg-gradient-to-r from-primary-container to-tertiary-container/70 h-1.5 rounded-full animate-[progress_2s_ease-in-out_infinite]" style="width: 70%"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════════ CONTEXT MENU ═══════════════ -->
+<div class="hidden fixed glass-panel rounded-xl border border-white/10 shadow-2xl p-1.5" id="context-menu">
+  <button onclick="ctxRename()" class="w-full text-left px-3 py-2 text-sm hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 text-on-surface">
+    <span class="material-symbols-outlined text-sm">edit</span> Rename
+  </button>
+  <button onclick="ctxDownload()" class="w-full text-left px-3 py-2 text-sm hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 text-on-surface">
+    <span class="material-symbols-outlined text-sm">download</span> Download Summary
+  </button>
+  <div class="my-1 border-t border-white/5"></div>
+  <button onclick="ctxDelete()" class="w-full text-left px-3 py-2 text-sm hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-2 text-error">
+    <span class="material-symbols-outlined text-sm">delete</span> Delete
+  </button>
+</div>
+
+<!-- ═══════════════ RENAME MODAL ═══════════════ -->
+<div class="hidden fixed inset-0 z-[300] flex items-center justify-center modal-backdrop" id="rename-modal">
+  <div class="glass-panel rounded-2xl p-6 border border-white/10 shadow-2xl w-full max-w-sm mx-4 slide-in">
+    <h3 class="font-headline font-bold text-on-surface mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-sm">edit</span> Rename Note
+    </h3>
+    <input id="rename-input" type="text" placeholder="Enter new title…"
+      class="w-full bg-surface-container border border-white/10 rounded-xl px-4 py-3 text-sm text-on-surface placeholder-outline focus:outline-none focus:border-primary-container/60 mb-4"/>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeRenameModal()" class="px-4 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-white/5 transition-colors">Cancel</button>
+      <button onclick="submitRename()" class="px-4 py-2 rounded-lg text-sm bg-gradient-to-br from-primary-container to-tertiary-container/60 text-white font-semibold hover:opacity-90 transition-all">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CHANGE PASSWORD MODAL ═══════════════ -->
+<div class="hidden fixed inset-0 z-[300] flex items-center justify-center modal-backdrop" id="change-pwd-modal">
+  <div class="glass-panel rounded-2xl p-6 border border-white/10 shadow-2xl w-full max-w-sm mx-4 slide-in">
+    <h3 class="font-headline font-bold text-on-surface mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-sm">lock</span> Change Password
+    </h3>
+    <div class="flex flex-col gap-3 mb-4">
+      <input id="pwd-old" type="password" placeholder="Current password"
+        class="w-full bg-surface-container border border-white/10 rounded-xl px-4 py-3 text-sm text-on-surface placeholder-outline focus:outline-none focus:border-primary-container/60"/>
+      <input id="pwd-new" type="password" placeholder="New password (min 8 chars)"
+        class="w-full bg-surface-container border border-white/10 rounded-xl px-4 py-3 text-sm text-on-surface placeholder-outline focus:outline-none focus:border-primary-container/60"/>
+      <input id="pwd-confirm" type="password" placeholder="Confirm new password"
+        class="w-full bg-surface-container border border-white/10 rounded-xl px-4 py-3 text-sm text-on-surface placeholder-outline focus:outline-none focus:border-primary-container/60"/>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button onclick="closeChangePwdModal()" class="px-4 py-2 rounded-lg text-sm text-on-surface-variant hover:bg-white/5 transition-colors">Cancel</button>
+      <button onclick="submitChangePassword()" class="px-4 py-2 rounded-lg text-sm bg-gradient-to-br from-primary-container to-tertiary-container/60 text-white font-semibold hover:opacity-90 transition-all">Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TOAST ═══════════════ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══════════════ SCRIPTS ═══════════════ -->
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+let token       = localStorage.getItem('sn_token');
+let currentUser = JSON.parse(localStorage.getItem('sn_user') || 'null');
+let currentNote = null;
+let ctxNoteId   = null;
+
+// Auth guard
+if (!token) window.location.href = '/';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+  });
+  return res;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  if (currentUser) {
+    document.getElementById('user-email-display').textContent = currentUser.email;
+    document.getElementById('dropdown-email').textContent    = currentUser.email;
+  }
+  await loadNotes();
+  setupUpload();
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#context-menu')) hideContextMenu();
+    if (!e.target.closest('#user-menu-wrapper')) hideUserMenu();
+  });
+});
+
+// ── Notes ────────────────────────────────────────────────────────────────────
+async function loadNotes() {
+  try {
+    const res   = await api('/api/notes');
+    const data  = await res.json();
+    if (!res.ok) { toast(data.error || 'Failed to load notes', 'error'); return; }
+    renderNotes(data.notes || []);
+  } catch { toast('Network error loading notes', 'error'); }
+}
+
+function renderNotes(notes) {
+  const list   = document.getElementById('notes-list');
+  const empty  = document.getElementById('notes-empty-state');
+  list.innerHTML = '';
+  if (!notes.length) { list.appendChild(empty); return; }
+  empty.remove();
+  notes.forEach(note => {
+    const el = document.createElement('div');
+    el.className = 'note-item px-4 py-3 rounded-xl flex items-center gap-3';
+    el.dataset.id = note.id;
+    el.innerHTML = `
+      <span class="material-symbols-outlined text-outline text-sm shrink-0" style="font-variation-settings:'FILL' 1;">description</span>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-on-surface truncate">${escHtml(note.title)}</div>
+        <div class="text-[10px] text-on-surface-variant">${fmtDate(note.created_at)}</div>
+      </div>
+      <button class="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-white/10 transition-all text-outline ctx-btn shrink-0" data-id="${note.id}" onclick="showContextMenu(event,'${note.id}')">
+        <span class="material-symbols-outlined text-sm">more_vert</span>
+      </button>
+    `;
+    el.addEventListener('click', (e) => { if (!e.target.closest('.ctx-btn')) openNote(note.id); });
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, note.id); });
+    el.classList.add('group');
+    list.appendChild(el);
+  });
+}
+
+async function openNote(noteId) {
+  // Highlight in sidebar
+  document.querySelectorAll('.note-item').forEach(el => el.classList.remove('active'));
+  const sideEl = document.querySelector(`.note-item[data-id="${noteId}"]`);
+  if (sideEl) sideEl.classList.add('active');
+
+  document.getElementById('welcome-screen').classList.add('hidden');
+  document.getElementById('note-viewer').classList.remove('hidden');
+  document.getElementById('summary-section').classList.add('hidden');
+  document.getElementById('processing-state').classList.add('hidden');
+
+  try {
+    const res  = await api(`/api/notes/${noteId}`);
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'Failed to load note', 'error'); return; }
+    currentNote = data.note;
+    document.getElementById('note-title-display').textContent = currentNote.title;
+    if (currentNote.summary_html) {
+      document.getElementById('summary-content').innerHTML = currentNote.summary_html;
+      document.getElementById('summary-section').classList.remove('hidden');
+    }
+    await loadChatHistory(noteId);
+  } catch { toast('Network error', 'error'); }
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+function setupUpload() {
+  const area  = document.getElementById('upload-area');
+  const input = document.getElementById('file-input');
+  area.addEventListener('dragover',  (e) => { e.preventDefault(); area.classList.add('drag-over'); });
+  area.addEventListener('dragleave', ()  => area.classList.remove('drag-over'));
+  area.addEventListener('drop', (e) => {
+    e.preventDefault(); area.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) uploadFile(f);
+  });
+  input.addEventListener('change', () => { if (input.files[0]) uploadFile(input.files[0]); input.value = ''; });
+}
+
+async function uploadFile(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) { toast('Only PDF files are supported', 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('File too large (max 10 MB)', 'error'); return; }
+
+  document.getElementById('upload-overlay').classList.remove('hidden');
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', file.name.replace(/\.pdf$/i, ''));
+
+  try {
+    const res  = await fetch('/api/notes/upload', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: fd,
+    });
+    const data = await res.json();
+    document.getElementById('upload-overlay').classList.add('hidden');
+    if (!res.ok) { toast(data.error || 'Upload failed', 'error'); return; }
+    toast('PDF uploaded and analyzed!');
+    await loadNotes();
+    openNote(data.note.id);
+  } catch {
+    document.getElementById('upload-overlay').classList.add('hidden');
+    toast('Upload failed – network error', 'error');
+  }
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function loadChatHistory(noteId) {
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = '';
+  try {
+    const res  = await api(`/api/chat/${noteId}/history`);
+    const data = await res.json();
+    if (!res.ok) return;
+    const chats = data.chats || [];
+    if (!chats.length) {
+      msgs.innerHTML = `<div class="text-center py-10 text-on-surface-variant text-sm" id="chat-empty-state">
+        <span class="material-symbols-outlined block text-4xl mb-2 text-outline">chat_bubble_outline</span>
+        Ask any question about this document</div>`;
+      return;
+    }
+    chats.forEach(c => appendMessage(c.user_message, c.ai_response_html || c.ai_response));
+  } catch {}
+}
+
+function appendMessage(userMsg, aiHtml) {
+  const msgs = document.getElementById('chat-messages');
+  document.getElementById('chat-empty-state')?.remove();
+
+  // User bubble
+  const uEl = document.createElement('div');
+  uEl.className = 'user-msg px-4 py-3 text-sm text-on-surface';
+  uEl.textContent = userMsg;
+  msgs.appendChild(uEl);
+
+  // AI bubble
+  const aEl = document.createElement('div');
+  aEl.className = 'ai-msg px-4 py-3 text-sm text-on-surface';
+  aEl.innerHTML = aiHtml;
+  msgs.appendChild(aEl);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+async function sendChat() {
+  if (!currentNote) { toast('Select a note first', 'info'); return; }
+  const input = document.getElementById('chat-input');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  input.value = '';
+  input.disabled = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const msgs = document.getElementById('chat-messages');
+  document.getElementById('chat-empty-state')?.remove();
+
+  // User bubble
+  const uEl = document.createElement('div');
+  uEl.className = 'user-msg px-4 py-3 text-sm text-on-surface';
+  uEl.textContent = msg;
+  msgs.appendChild(uEl);
+
+  // Typing indicator
+  const tEl = document.createElement('div');
+  tEl.className = 'ai-msg px-4 py-3 text-sm text-on-surface';
+  tEl.innerHTML = '<span class="typing-dots text-primary"><span>·</span><span>·</span><span>·</span></span>';
+  msgs.appendChild(tEl);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const res  = await api('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ note_id: currentNote.id, message: msg }),
+    });
+    const data = await res.json();
+    tEl.remove();
+    if (!res.ok) { toast(data.error || 'Chat failed', 'error'); return; }
+    const aEl = document.createElement('div');
+    aEl.className = 'ai-msg px-4 py-3 text-sm text-on-surface';
+    aEl.innerHTML = data.response_html || data.response;
+    msgs.appendChild(aEl);
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch {
+    tEl.remove();
+    toast('Network error – chat failed', 'error');
+  } finally {
+    input.disabled = false;
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }
+}
+
+async function clearChat() {
+  if (!currentNote) return;
+  try {
+    await api(`/api/chat/${currentNote.id}/clear`, { method: 'DELETE' });
+    document.getElementById('chat-messages').innerHTML = `
+      <div class="text-center py-10 text-on-surface-variant text-sm" id="chat-empty-state">
+        <span class="material-symbols-outlined block text-4xl mb-2 text-outline">chat_bubble_outline</span>
+        Ask any question about this document</div>`;
+    toast('Chat cleared');
+  } catch { toast('Failed to clear chat', 'error'); }
+}
+
+// ── Rename ────────────────────────────────────────────────────────────────────
+function openRenameModal() {
+  if (!currentNote) return;
+  document.getElementById('rename-input').value = currentNote.title;
+  document.getElementById('rename-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('rename-input').focus(), 50);
+}
+function closeRenameModal() { document.getElementById('rename-modal').classList.add('hidden'); }
+
+async function submitRename() {
+  const title = document.getElementById('rename-input').value.trim();
+  if (!title || !currentNote) return;
+  try {
+    const res  = await api(`/api/notes/${currentNote.id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'Rename failed', 'error'); return; }
+    currentNote.title = title;
+    document.getElementById('note-title-display').textContent = title;
+    const sideEl = document.querySelector(`.note-item[data-id="${currentNote.id}"] .truncate`);
+    if (sideEl) sideEl.textContent = title;
+    closeRenameModal();
+    toast('Note renamed');
+  } catch { toast('Network error', 'error'); }
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function deleteCurrentNote() {
+  if (!currentNote) return;
+  if (!confirm(`Delete "${currentNote.title}"? This cannot be undone.`)) return;
+  try {
+    await api(`/api/notes/${currentNote.id}`, { method: 'DELETE' });
+    document.querySelector(`.note-item[data-id="${currentNote.id}"]`)?.remove();
+    currentNote = null;
+    document.getElementById('note-viewer').classList.add('hidden');
+    document.getElementById('welcome-screen').classList.remove('hidden');
+    toast('Note deleted');
+    await loadNotes();
+  } catch { toast('Failed to delete note', 'error'); }
+}
+
+// ── Download ──────────────────────────────────────────────────────────────────
+function downloadSummary() {
+  if (!currentNote) return;
+  window.open(`/api/notes/${currentNote.id}/download-summary?token=${encodeURIComponent(token)}`, '_blank');
+}
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+function showContextMenu(e, noteId) {
+  e.preventDefault(); e.stopPropagation();
+  ctxNoteId = noteId;
+  const menu = document.getElementById('context-menu');
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+  menu.style.top  = Math.min(e.clientY, window.innerHeight - 140) + 'px';
+  menu.classList.remove('hidden');
+}
+function hideContextMenu() { document.getElementById('context-menu').classList.add('hidden'); ctxNoteId = null; }
+
+async function ctxRename() {
+  hideContextMenu();
+  if (!ctxNoteId) return;
+  if (currentNote?.id !== ctxNoteId) await openNote(ctxNoteId);
+  openRenameModal();
+}
+async function ctxDownload() {
+  const id = ctxNoteId; hideContextMenu();
+  window.open(`/api/notes/${id}/download-summary?token=${encodeURIComponent(token)}`, '_blank');
+}
+async function ctxDelete() {
+  const id = ctxNoteId; hideContextMenu();
+  if (!id) return;
+  if (!confirm('Delete this note?')) return;
+  try {
+    await api(`/api/notes/${id}`, { method: 'DELETE' });
+    if (currentNote?.id === id) {
+      currentNote = null;
+      document.getElementById('note-viewer').classList.add('hidden');
+      document.getElementById('welcome-screen').classList.remove('hidden');
+    }
+    toast('Note deleted');
+    await loadNotes();
+  } catch { toast('Failed to delete', 'error'); }
+}
+
+// ── User menu ──────────────────────────────────────────────────────────────────
+function toggleUserMenu() {
+  const dd = document.getElementById('user-dropdown');
+  dd.classList.toggle('opacity-0');
+  dd.classList.toggle('invisible');
+}
+function hideUserMenu() {
+  const dd = document.getElementById('user-dropdown');
+  dd.classList.add('opacity-0', 'invisible');
+}
+
+// ── Change password ───────────────────────────────────────────────────────────
+function openChangePasswordModal() {
+  hideUserMenu();
+  document.getElementById('change-pwd-modal').classList.remove('hidden');
+  document.getElementById('pwd-old').value = '';
+  document.getElementById('pwd-new').value = '';
+  document.getElementById('pwd-confirm').value = '';
+}
+function closeChangePwdModal() { document.getElementById('change-pwd-modal').classList.add('hidden'); }
+
+async function submitChangePassword() {
+  const oldPwd = document.getElementById('pwd-old').value;
+  const newPwd = document.getElementById('pwd-new').value;
+  const confirm = document.getElementById('pwd-confirm').value;
+  if (newPwd !== confirm) { toast('New passwords do not match', 'error'); return; }
+  try {
+    const res  = await api('/api/change-password', { method: 'POST', body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }) });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || 'Failed to change password', 'error'); return; }
+    closeChangePwdModal();
+    toast('Password changed successfully');
+  } catch { toast('Network error', 'error'); }
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+function logout() {
+  localStorage.removeItem('sn_token');
+  localStorage.removeItem('sn_user');
+  window.location.href = '/';
+}
+
+// ── Mobile sidebar ────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('-translate-x-full');
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+</script>
+</body>
+</html>
