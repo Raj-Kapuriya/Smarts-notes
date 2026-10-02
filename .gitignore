@@ -17,6 +17,8 @@ env/
 .env.local
 
 # Environment secrets
+.env
+
 
 # Flask
 instance/
