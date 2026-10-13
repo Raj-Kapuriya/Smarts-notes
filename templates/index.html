@@ -128,14 +128,21 @@
         <input id="login-email" type="email" placeholder="you@example.com" required
           class="input-field w-full px-4 py-3 rounded-xl text-sm text-on-surface placeholder-outline"/>
       </div>
-      <div class="relative">
-        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1 block">Password</label>
-        <input id="login-password" type="password" placeholder="••••••••" required
-          class="input-field w-full px-4 py-3 rounded-xl text-sm text-on-surface placeholder-outline pr-12"/>
-        <button type="button" onclick="togglePwd('login-password', this)"
-          class="absolute right-3 bottom-3 text-outline hover:text-on-surface-variant">
-          <span class="material-symbols-outlined text-lg">visibility</span>
-        </button>
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider block">Password</label>
+          <button type="button" onclick="switchTab('forgot')" class="text-xs text-primary hover:text-white transition-colors cursor-pointer">
+            Forgot password?
+          </button>
+        </div>
+        <div class="relative">
+          <input id="login-password" type="password" placeholder="••••••••" required
+            class="input-field w-full px-4 py-3 rounded-xl text-sm text-on-surface placeholder-outline pr-12"/>
+          <button type="button" onclick="togglePwd('login-password', this)"
+            class="absolute right-3 bottom-3 text-outline hover:text-on-surface-variant">
+            <span class="material-symbols-outlined text-lg">visibility</span>
+          </button>
+        </div>
       </div>
       <button type="submit" id="login-btn"
         class="btn-primary w-full py-3 rounded-xl font-headline font-bold text-white text-sm tracking-wide flex items-center justify-center gap-2 mt-1">
@@ -176,6 +183,54 @@
       </button>
     </form>
 
+    <!-- Forgot Password form -->
+    <form id="forgot-form" class="flex flex-col gap-4 hidden" onsubmit="handleForgotPassword(event)">
+      <div class="text-left">
+        <h2 class="text-base font-headline font-semibold text-on-surface flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-xl">lock_reset</span>
+          Recover Password
+        </h2>
+        <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">
+          Enter your registered email address below. We'll generate a new secure password and send it directly to your email inbox.
+        </p>
+      </div>
+
+      <div>
+        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1 block">Email</label>
+        <input id="forgot-email" type="email" placeholder="you@example.com" required
+          class="input-field w-full px-4 py-3 rounded-xl text-sm text-on-surface placeholder-outline"/>
+      </div>
+
+      <!-- Dev mode password display banner (when SMTP is not configured) -->
+      <div id="dev-password-banner" class="hidden p-3.5 rounded-xl bg-primary/10 border border-primary/30 text-xs text-on-surface">
+        <p class="font-semibold text-primary mb-1 flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-base">vpn_key</span>
+          New Password Generated
+        </p>
+        <div class="flex items-center justify-between bg-black/40 border border-white/10 px-3 py-2 rounded-lg font-mono text-sm text-white select-all mt-1.5">
+          <span id="dev-password-text" class="font-semibold tracking-wider"></span>
+          <button type="button" onclick="copyDevPassword()" class="text-xs text-primary hover:text-white px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
+            Copy
+          </button>
+        </div>
+        <p class="text-[11px] text-on-surface-variant mt-2 leading-relaxed">
+          Use this password to log in. You can change it anytime in your dashboard settings.
+        </p>
+      </div>
+
+      <button type="submit" id="forgot-btn"
+        class="btn-primary w-full py-3 rounded-xl font-headline font-bold text-white text-sm tracking-wide flex items-center justify-center gap-2 mt-1">
+        <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1;">mark_email_read</span>
+        Send Password to Email
+      </button>
+
+      <button type="button" onclick="switchTab('login')"
+        class="text-xs text-center text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center gap-1 pt-1 pb-0.5 cursor-pointer">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        Back to Sign In
+      </button>
+    </form>
+
     <!-- Feature pills -->
     <div class="flex flex-wrap gap-2 justify-center pt-2 border-t border-white/5">
       <span class="text-[10px] px-2.5 py-1 rounded-full bg-primary-container/20 text-primary border border-primary/20">📄 PDF Summaries</span>
@@ -197,10 +252,24 @@
 
   function switchTab(tab) {
     const isLogin = tab === 'login';
+    const isRegister = tab === 'register';
+    const isForgot = tab === 'forgot';
+
     document.getElementById('login-form').classList.toggle('hidden', !isLogin);
-    document.getElementById('register-form').classList.toggle('hidden', isLogin);
+    document.getElementById('register-form').classList.toggle('hidden', !isRegister);
+    document.getElementById('forgot-form').classList.toggle('hidden', !isForgot);
+
     document.getElementById('tab-login').classList.toggle('active', isLogin);
-    document.getElementById('tab-register').classList.toggle('active', !isLogin);
+    document.getElementById('tab-register').classList.toggle('active', isRegister);
+
+    if (isForgot) {
+      const loginEmail = document.getElementById('login-email').value.trim();
+      if (loginEmail) {
+        document.getElementById('forgot-email').value = loginEmail;
+      }
+      const banner = document.getElementById('dev-password-banner');
+      if (banner) banner.classList.add('hidden');
+    }
   }
 
   function togglePwd(inputId, btn) {
@@ -275,6 +344,58 @@
     } finally {
       setLoading('reg-btn', false);
     }
+  }
+
+  // ── Forgot Password ──────────────────────────────────────────────────────
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById('forgot-email').value.trim();
+    setLoading('forgot-btn', true);
+    const banner = document.getElementById('dev-password-banner');
+    if (banner) banner.classList.add('hidden');
+
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast(data.error || 'Failed to send password', 'error');
+        return;
+      }
+
+      toast(data.message || 'Password sent to your email!', 'success');
+      document.getElementById('login-email').value = email;
+
+      if (data.dev_password) {
+        // SMTP not configured yet; display generated password banner for testing
+        document.getElementById('dev-password-text').textContent = data.dev_password;
+        banner.classList.remove('hidden');
+        document.getElementById('login-password').value = data.dev_password;
+      } else {
+        // Live email sent; redirect user to login tab
+        setTimeout(() => {
+          switchTab('login');
+          document.getElementById('login-password').focus();
+        }, 2000);
+      }
+    } catch {
+      toast('Network error – please try again', 'error');
+    } finally {
+      setLoading('forgot-btn', false);
+    }
+  }
+
+  function copyDevPassword() {
+    const pwd = document.getElementById('dev-password-text').textContent;
+    if (!pwd) return;
+    navigator.clipboard.writeText(pwd).then(() => {
+      toast('Password copied to clipboard!');
+    }).catch(() => {
+      toast('Password: ' + pwd);
+    });
   }
 </script>
 </body>

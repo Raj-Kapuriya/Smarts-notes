@@ -66,6 +66,15 @@ PINECONE_API_KEY       = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME    = os.getenv("PINECONE_INDEX_NAME", "smart-notes-index")
 HUGGINGFACE_API_KEY    = os.getenv("HUGGINGFACE_API_KEY")
 
+# SMTP Email Configuration
+SMTP_HOST              = os.getenv("SMTP_HOST")
+SMTP_PORT              = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER              = os.getenv("SMTP_USER")
+SMTP_PASSWORD          = os.getenv("SMTP_PASSWORD")
+SMTP_FROM_EMAIL        = os.getenv("SMTP_FROM_EMAIL") or SMTP_USER or "noreply@smartnotes.ai"
+SMTP_USE_TLS           = os.getenv("SMTP_USE_TLS", "True").strip().lower() in ("true", "1", "yes")
+SMTP_USE_SSL           = os.getenv("SMTP_USE_SSL", "False").strip().lower() in ("true", "1", "yes")
+
 _required = [
     SUPABASE_URL, SUPABASE_KEY, GOOGLE_API_KEY,
     CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET,
@@ -258,6 +267,90 @@ def require_auth(fn):
     return wrapper
 
 
+def send_password_email(recipient_email: str, new_password: str):
+    """
+    Sends an email containing the new password to the recipient.
+    Returns (success: bool, message: str).
+    """
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning(
+            f"SMTP not configured in environment. Generated password for '{recipient_email}': {new_password}"
+        )
+        return False, "SMTP server is not configured in .env."
+
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Your Smart Notes Password"
+        msg["From"] = SMTP_FROM_EMAIL
+        msg["To"] = recipient_email
+
+        text_content = (
+            f"Hello,\n\n"
+            f"You requested to recover your password for Smart Notes.\n\n"
+            f"Your new password is: {new_password}\n\n"
+            f"Please use this password to sign in. For security, we recommend changing your password from your account settings after logging in.\n\n"
+            f"— The Smart Notes Team"
+        )
+
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0c0c1d; color: #e3e0f8; margin: 0; padding: 24px; }}
+    .container {{ max-width: 500px; margin: 0 auto; background: #1a1a2b; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
+    .header {{ text-align: center; margin-bottom: 24px; }}
+    .logo {{ font-size: 32px; }}
+    .title {{ font-size: 22px; font-weight: 700; color: #b9c3ff; margin-top: 8px; }}
+    .box {{ background: rgba(113,137,246,0.15); border: 1px dashed #7189f6; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0; }}
+    .password {{ font-size: 22px; font-family: monospace; font-weight: bold; letter-spacing: 2px; color: #ffffff; word-break: break-all; }}
+    .text {{ font-size: 14px; line-height: 1.6; color: #c5c5d5; }}
+    .footer {{ margin-top: 24px; font-size: 12px; color: #8f909e; text-align: center; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">📚</div>
+      <div class="title">Smart Notes</div>
+    </div>
+    <p class="text">Hello,</p>
+    <p class="text">You requested to recover your password. Here is your new password to sign in:</p>
+    <div class="box">
+      <span class="password">{new_password}</span>
+    </div>
+    <p class="text">Please use this password to sign in. For your security, you can change your password in the dashboard settings after logging in.</p>
+    <p class="footer">If you didn't request this change, please sign in and change your password immediately.</p>
+  </div>
+</body>
+</html>"""
+
+        msg.attach(MIMEText(text_content, "plain"))
+        msg.attach(MIMEText(html_content, "html"))
+
+        if SMTP_USE_SSL:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15)
+            if SMTP_USE_TLS:
+                server.starttls()
+
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_FROM_EMAIL, recipient_email, msg.as_string())
+        server.quit()
+
+        logger.info(f"Password reset email successfully sent to {recipient_email}")
+        return True, "Email sent successfully."
+
+    except Exception as exc:
+        logger.error(f"Failed to send email to {recipient_email}: {exc}")
+        return False, str(exc)
+
+
 # ── PDF utilities ─────────────────────────────────────────────────────────────
 @timeout(60)
 def extract_pdf_text(file_bytes: bytes) -> str | None:
@@ -448,6 +541,72 @@ def login():
     except Exception as exc:
         logger.error(f"Login error: {exc}")
         return jsonify({"error": "Login failed"}), 500
+
+
+@app.route("/api/forgot-password", methods=["POST"])
+def forgot_password():
+    data  = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    db = services.supabase()
+    try:
+        result = db.table("users").select("id, email").eq("email", email).execute()
+        if not result.data:
+            return jsonify({"error": "No account found with this email"}), 404
+
+        user = result.data[0]
+
+        # Generate a secure readable temporary password (10 characters: uppercase, lowercase, digit, symbol)
+        import secrets
+        import string
+        special_chars = "!@#$%"
+        char_pool = string.ascii_letters + string.digits + special_chars
+        password_chars = [
+            secrets.choice(string.ascii_uppercase),
+            secrets.choice(string.ascii_lowercase),
+            secrets.choice(string.digits),
+            secrets.choice(special_chars),
+        ] + [secrets.choice(char_pool) for _ in range(6)]
+        secrets.SystemRandom().shuffle(password_chars)
+        new_temp_password = "".join(password_chars)
+
+        # Hash new password with bcrypt
+        import bcrypt
+        new_hashed = bcrypt.hashpw(new_temp_password.encode(), bcrypt.gensalt()).decode()
+
+        # Update in database
+        db.table("users").update({
+            "password": new_hashed,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", user["id"]).execute()
+
+        # Send password via email
+        sent, err_msg = send_password_email(email, new_temp_password)
+
+        if sent:
+            return jsonify({
+                "message": "Your new password has been sent to your email. Please check your inbox and sign in.",
+                "smtp_configured": True
+            }), 200
+        else:
+            # If SMTP is not yet configured, provide dev password so local testing works seamlessly
+            if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+                return jsonify({
+                    "message": "Temporary password created! (Note: SMTP credentials are not configured in .env yet, so the password is provided below and in the terminal).",
+                    "dev_password": new_temp_password,
+                    "smtp_configured": False
+                }), 200
+            else:
+                return jsonify({
+                    "error": f"Failed to send email: {err_msg}. Please check your SMTP settings in .env."
+                }), 500
+
+    except Exception as exc:
+        logger.error(f"Forgot password error: {exc}")
+        return jsonify({"error": "Failed to reset password. Please try again later."}), 500
 
 
 @app.route("/api/change-password", methods=["POST"])

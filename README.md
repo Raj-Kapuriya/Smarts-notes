@@ -128,6 +128,7 @@ smart-notes/
 |---|---|---|
 | POST | `/api/register` | Create account |
 | POST | `/api/login` | Sign in, get JWT |
+| POST | `/api/forgot-password` | Generate & send temporary password to email |
 | POST | `/api/change-password` | Change password (auth required) |
 | GET | `/api/user` | Get current user info |
 
